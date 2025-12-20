@@ -11,7 +11,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 
 public class Registration extends JFrame implements ActionListener {
-    // UI components (renamed label to avoid collisions)
+
     JLabel header = new JLabel(" Ecommerce | SignUp");
     JLabel username = new JLabel("Username");
     JTextField usernameTxt = new JTextField();
@@ -40,7 +40,6 @@ public class Registration extends JFrame implements ActionListener {
         setLayout(null);
         setResizable(false);
 
-        // positioning the components
         header.setBounds(100, 10, 450, 50);
         header.setFont(new Font("SansSerif", Font.BOLD, 24));
 
@@ -67,7 +66,6 @@ public class Registration extends JFrame implements ActionListener {
         footer.setBounds(60, 360, 400, 20);
         footer.setForeground(new Color(190, 117, 2));
 
-        // adding components to the window
         add(header);
         add(username);
         add(usernameTxt);
@@ -83,20 +81,17 @@ public class Registration extends JFrame implements ActionListener {
         add(register);
         add(footer);
 
-        //Adding action listeners
         login.addActionListener(this);
         register.addActionListener(this);
 
-        // center and show last
         setLocationRelativeTo(null);
         setVisible(true);
     }
 
-    // password hashing method
     private String hashPassword(String password) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(password.getBytes("UTF-8")); // specify encoding
+            byte[] hash = md.digest(password.getBytes("UTF-8"));
             StringBuilder sb = new StringBuilder();
             for (byte b : hash) {
                 sb.append(String.format("%02x", b));
@@ -107,12 +102,10 @@ public class Registration extends JFrame implements ActionListener {
         }
     }
 
-    @Override
     public void actionPerformed(ActionEvent e) {
         if (e.getSource() == login) {
             dispose();
-            // open login form if you have one
-            return;
+
         } else if (e.getSource() == register) {
             String user = usernameTxt.getText().trim();
             String hashedPassword = hashPassword(new String(passwordTxt.getPassword()));
@@ -120,19 +113,16 @@ public class Registration extends JFrame implements ActionListener {
             String fullN = fullnameTxt.getText().trim();
             String rol = (String) roleCombo.getSelectedItem();
 
-            // basic validation
             if (user.isEmpty() || hashedPassword.isEmpty() || fullN.isEmpty() || rol == null || rol.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "⚠️ Please fill all the required fields");
+                JOptionPane.showMessageDialog(this, " Please fill all the required fields");
                 return;
             }
 
-            // optional: simple email validation
             if (!emailVal.isEmpty() && !emailVal.matches("^[\\w.-]+@[\\w.-]+\\.[A-Za-z]{2,6}$")) {
-                JOptionPane.showMessageDialog(this, "⚠️ Invalid email format");
+                JOptionPane.showMessageDialog(this, " Invalid email format");
                 return;
             }
-
-            // Save to DB (execute the prepared statement)
+            
             String sql = "INSERT INTO users (username, password_hash, email, full_name, role) VALUES (?, ?, ?, ?, ?)";
 
             try (Connection conn = DatabaseConnection.getConnection();
@@ -146,8 +136,9 @@ public class Registration extends JFrame implements ActionListener {
 
                 int rows = ps.executeUpdate();
                 if (rows > 0) {
-                    JOptionPane.showMessageDialog(this, " Registration successful");
-                    // maybe clear fields or navigate to login
+                    JOptionPane.showMessageDialog(this, " Registration successful! Please login.");
+                    dispose();
+                    new Elogin();
                 } else {
                     JOptionPane.showMessageDialog(this, " Registration failed");
                 }
@@ -160,7 +151,6 @@ public class Registration extends JFrame implements ActionListener {
     }
 
     public static void main(String[] args) {
-        // If you want a consistent look and feel:
         try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception ignored) {}
         new Registration();
     }
