@@ -1,7 +1,6 @@
 package com.form;
 
 import com.test.DisplayNames;
-import com.workings.AdminDashboard;
 import com.test.DatabaseConnection;
 
 import javax.swing.*;
@@ -115,7 +114,6 @@ public class Elogin extends JFrame implements ActionListener {
                 var rs = ps.executeQuery();
                 if (rs.next()){
                     JOptionPane.showMessageDialog(null, " Login successful!\nWelcome ! "+ rs.getString("full_name"));
-                    new AdminDashboard("");
 
                     com.test.DisplayNames.CurrentUserFullName = rs.getString("full_name");
                     DisplayNames.CurrentUserId = rs.getInt("user_id");
