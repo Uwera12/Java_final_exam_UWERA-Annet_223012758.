@@ -13,25 +13,21 @@ import java.sql.*;
 public class SellerDashboard extends JFrame implements ActionListener {
 
     private int userId;
-
     private JLabel welcomeLabel;
     private JTabbedPane tabbedPane = new JTabbedPane();
 
-    /* PANELS */
     private JPanel productPanel = new JPanel();
     private JPanel orderPanel = new JPanel();
     private JPanel shipmentPanel = new JPanel();
     private JPanel categoryPanel = new JPanel();
     private JPanel paymentPanel = new JPanel();
 
-    /* TABLES */
     private JTable productTable = new JTable();
     private JTable orderTable = new JTable();
     private JTable shipmentTable = new JTable();
     private JTable categoryTable = new JTable();
     private JTable paymentTable = new JTable();
 
-    /* BUTTONS */
     private JButton logoutButton = new JButton("Logout");
 
     private JButton addProductButton = new JButton("Add Product");
@@ -63,7 +59,7 @@ public class SellerDashboard extends JFrame implements ActionListener {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        /* HEADER */
+
         JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 10));
         JLabel title = new JLabel("GET-ONE PLATFORM");
         title.setFont(new Font("Segoe UI", Font.BOLD, 22));
@@ -79,7 +75,7 @@ public class SellerDashboard extends JFrame implements ActionListener {
         header.add(logoutButton);
         add(header, BorderLayout.NORTH);
 
-        /* PANELS */
+
         setupProductPanel();
         setupOrderPanel();
         setupShipmentPanel();
@@ -95,7 +91,7 @@ public class SellerDashboard extends JFrame implements ActionListener {
 
         add(tabbedPane, BorderLayout.CENTER);
 
-        /* ACTIONS */
+
         logoutButton.addActionListener(this);
         addProductButton.addActionListener(this);
         updateProductButton.addActionListener(this);
@@ -126,7 +122,7 @@ public class SellerDashboard extends JFrame implements ActionListener {
         setVisible(true);
     }
 
-    /* ================= PRODUCT ================= */
+
 
     private void setupProductPanel() {
         productPanel.setLayout(new BorderLayout());
@@ -143,7 +139,7 @@ public class SellerDashboard extends JFrame implements ActionListener {
     private void loadProducts() {
         DefaultTableModel m = new DefaultTableModel();
         m.setColumnIdentifiers(new Object[]{
-                "ID","Name","Description","Price","Category","Stock","User","Status","Created"
+                "ID","Name","Description","Price","Category","Stock","User ID ","Status","Created_at"
         });
         productTable.setModel(m);
 
@@ -169,8 +165,6 @@ public class SellerDashboard extends JFrame implements ActionListener {
         }
     }
 
-    /* ================= ORDERS ================= */
-
     private void setupOrderPanel() {
         orderPanel.setLayout(new BorderLayout());
         orderPanel.add(new JScrollPane(orderTable), BorderLayout.CENTER);
@@ -186,7 +180,7 @@ public class SellerDashboard extends JFrame implements ActionListener {
     private void loadOrders() {
         DefaultTableModel m = new DefaultTableModel();
         m.setColumnIdentifiers(new Object[]{
-                "Order ID","Customer","Order No","Date","Status","Total","Payment"
+                "Order ID","User ID","Order Number","Date","Status","Total Amount","Payment Method"
         });
         orderTable.setModel(m);
 
@@ -220,8 +214,6 @@ public class SellerDashboard extends JFrame implements ActionListener {
         }
     }
 
-    /* ================= SHIPMENTS ================= */
-
     private void setupShipmentPanel() {
         shipmentPanel.setLayout(new BorderLayout());
         shipmentPanel.add(new JScrollPane(shipmentTable), BorderLayout.CENTER);
@@ -236,7 +228,7 @@ public class SellerDashboard extends JFrame implements ActionListener {
     private void loadShipments() {
         DefaultTableModel m = new DefaultTableModel();
         m.setColumnIdentifiers(new Object[]{
-                "Shipment ID","Order","Tracking","Status","Created"
+                "Shipment ID","Order ID","Tracking Number","Status","Created"
         });
         shipmentTable.setModel(m);
 
@@ -268,8 +260,6 @@ public class SellerDashboard extends JFrame implements ActionListener {
             showError(e);
         }
     }
-
-    /* ================= CATEGORIES ================= */
 
     private void setupCategoryPanel() {
         categoryPanel.setLayout(new BorderLayout());
@@ -307,9 +297,6 @@ public class SellerDashboard extends JFrame implements ActionListener {
             showError(e);
         }
     }
-
-    /* ================= PAYMENTS ================= */
-
     private void setupPaymentPanel() {
         paymentPanel.setLayout(new BorderLayout());
         paymentPanel.add(new JScrollPane(paymentTable), BorderLayout.CENTER);
@@ -351,7 +338,6 @@ public class SellerDashboard extends JFrame implements ActionListener {
         }
     }
 
-
     public void actionPerformed(ActionEvent e) {
         Object s = e.getSource();
 
@@ -375,7 +361,6 @@ public class SellerDashboard extends JFrame implements ActionListener {
         else if (s == deleteShipmentButton) deleteShipment();
     }
 
-    /* ================= HELPERS ================= */
     private void addProduct() {
 
         JTextField name = new JTextField();
@@ -400,16 +385,16 @@ public class SellerDashboard extends JFrame implements ActionListener {
 
             try (Connection conn = DatabaseConnection.getConnection()) {
 
-                String sql = "INSERT INTO products(name, description, price, stock, category_id) "
-                        + "VALUES (?, ?, ?, ?,?)";
+                String sql = "INSERT INTO products(name, description, price, stock, category_id, user_id) "
+                        + "VALUES (?, ?, ?, ?,?, ?)";
                 PreparedStatement ps = conn.prepareStatement(sql);
 
                 ps.setString(1, name.getText());
-                ps.setString(5, description.getText());
-                ps.setDouble(2, Double.parseDouble(price.getText()));
-                ps.setInt(3, Integer.parseInt(stock.getText()));
-                ps.setInt(4, Integer.parseInt(categoryId.getText()));
-
+                ps.setString(2,description.getText());
+                ps.setDouble(3, Double.parseDouble(price.getText()));
+                ps.setInt(4, Integer.parseInt(stock.getText()));
+                ps.setInt(5, Integer.parseInt(categoryId.getText()));
+                ps.setInt(6, userId);
 
 
                 ps.executeUpdate();
@@ -436,12 +421,14 @@ public class SellerDashboard extends JFrame implements ActionListener {
 
         JTextField name = new JTextField(
                 productTable.getValueAt(row, 1).toString());
-        JTextField price = new JTextField(
+        JTextField description = new JTextField(
                 productTable.getValueAt(row, 2).toString());
-        JTextField quantity = new JTextField(
+        JTextField price = new JTextField(
                 productTable.getValueAt(row, 3).toString());
-        JTextField categoryId = new JTextField(
+        JTextField stock = new JTextField(
                 productTable.getValueAt(row, 4).toString());
+        JTextField categoryId = new JTextField(
+                productTable.getValueAt(row, 5).toString());
 
         Object[] fields = {
                 "Product Name:", name,
@@ -459,13 +446,13 @@ public class SellerDashboard extends JFrame implements ActionListener {
 
             try (Connection conn = DatabaseConnection.getConnection()) {
 
-                String sql = "UPDATE products SET name=?, price=?, quantity=?, category_id=? "
+                String sql = "UPDATE products SET name=?, price=?, stock=?, category_id=? "
                         + "WHERE product_id=?";
                 PreparedStatement ps = conn.prepareStatement(sql);
 
                 ps.setString(1, name.getText());
                 ps.setDouble(2, Double.parseDouble(price.getText()));
-                ps.setInt(3, Integer.parseInt(quantity.getText()));
+                ps.setInt(3, Integer.parseInt(stock.getText()));
                 ps.setInt(4, Integer.parseInt(categoryId.getText()));
                 ps.setInt(5, productId);
 
@@ -1013,10 +1000,6 @@ public class SellerDashboard extends JFrame implements ActionListener {
                 JOptionPane.showMessageDialog(this, e.getMessage());
             }
         }
-    }
-
-    private int parseId(Object o) {
-        return Integer.parseInt(o.toString());
     }
 
     private void showError(Exception e) {
