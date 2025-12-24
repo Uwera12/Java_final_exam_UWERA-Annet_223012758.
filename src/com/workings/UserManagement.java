@@ -1,6 +1,5 @@
 package com.workings;
 
-
 import com.test.DatabaseConnection;
 
 import javax.swing.*;
@@ -26,7 +25,6 @@ import java.sql.*;
         private JLabel totalUsers = new JLabel("Total Users: 0");
         private JButton returnBackBtn = new JButton(" BACK TO HOME");
 
-
         public UserManagement() {
             setTitle("GET-ONE | Admin Dashboard ");
             setSize(1100, 700);
@@ -44,7 +42,6 @@ import java.sql.*;
             deleteBtn.addActionListener(this);
             returnBackBtn.addActionListener(this);
             addUserBtn.addActionListener(this);
-
 
             loadUsers();
             setVisible(true);
@@ -150,8 +147,6 @@ import java.sql.*;
                 }
             }
         }
-
-
         private void deleteUser(int productId) {
             try(Connection conn = DatabaseConnection.getConnection()){
                 String query = "DELETE FROM users WHERE user_id = ?";
@@ -163,8 +158,6 @@ import java.sql.*;
                 JOptionPane.showMessageDialog(this, "Failed to delete User");
             }
         }
-
-
         private void showEditUserDialog(int userId, String userName, String email, String fullName, String role) {
             JTextField userNameField = new JTextField(userName);
             JTextField emailField = new JTextField(email);
@@ -237,11 +230,8 @@ import java.sql.*;
                 JOptionPane.showMessageDialog(this, "Failed to Update User");
             }
         }
-
-
-        //loading products
         public void loadUsers() {
-            // Table model & table
+        
             DefaultTableModel model = new DefaultTableModel();
             model.setColumnIdentifiers(new String[]{"user_id", "username", "password_hash", "email", "full_name", "role", "created_at", "last_login"});
             usersTable.setModel(model);
@@ -267,7 +257,7 @@ import java.sql.*;
                             rs.getTimestamp("last_login"),
                     });
                 }
-                // center align ProductID
+                
                 DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
                 centerRenderer.setHorizontalAlignment(JLabel.CENTER);
                 usersTable.getColumnModel().getColumn(0).setCellRenderer(centerRenderer);
@@ -280,19 +270,14 @@ import java.sql.*;
             }
         }
 
-        @Override
         public void actionPerformed(ActionEvent e) {
             Object src = e.getSource();
-
-            //adding product to the list
             if (src == addUserBtn) {
                 showAddUserDialog();
             }
-            // this if where i refreshed my products
             else if (src == refreshBtn) {
                 loadUsers();
 
-                //progress bar before refreshing confirmation message message
                 JProgressBar progressBar = new JProgressBar(0,100);
                 progressBar.setStringPainted(true);
                 JOptionPane pane = new JOptionPane(progressBar,JOptionPane.INFORMATION_MESSAGE,JOptionPane.DEFAULT_OPTION,null,new Object[]{},null);
@@ -310,7 +295,7 @@ import java.sql.*;
                 dialog.setVisible(true);
                 JOptionPane.showMessageDialog(this, "Now your Users are refreshed well!");
             }
-            // condition to search a product
+        
             else if (src == searchBtn) {
                 String search = searchField.getText().trim();
                 if (search.isEmpty()) {
@@ -363,4 +348,5 @@ import java.sql.*;
             SwingUtilities.invokeLater(UserManagement::new);
         }
     }
+
 
