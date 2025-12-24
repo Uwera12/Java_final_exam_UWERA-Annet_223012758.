@@ -38,7 +38,6 @@ public class CustomerDashboard extends JFrame implements ActionListener {
         setLayout(new BorderLayout());
         setResizable(true);
 
-        // ===== TOP PANEL =====
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setBackground(Color.WHITE);
         topPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
@@ -61,7 +60,6 @@ public class CustomerDashboard extends JFrame implements ActionListener {
         logoPanel.add(logo);
         logoPanel.add(welcomeLabel);
 
-        // --- Search Bar ---
         searchField = new JTextField("Search for anything...");
         searchField.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         searchField.setPreferredSize(new Dimension(300, 35));
@@ -81,7 +79,6 @@ public class CustomerDashboard extends JFrame implements ActionListener {
         searchPanel.add(categoryComboBox);
         searchPanel.add(searchButton);
 
-        // --- Navigation Labels ---
         JPanel navPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         navPanel.setBackground(Color.WHITE);
         JLabel[] navLabels = {homelabel, profilelabel, orderlabel, logoutlabel};
@@ -127,7 +124,6 @@ public class CustomerDashboard extends JFrame implements ActionListener {
         topContainer.add(navRow, BorderLayout.SOUTH);
         add(topContainer, BorderLayout.NORTH);
 
-        // ===== CONTENT PANELS =====
         contentPanel.add(CreateHomePanel(), "Home");
         contentPanel.add(CreateProfilePanel(), "Profile");
         contentPanel.add(CreateOrderPanel(), "Orders");
@@ -136,7 +132,6 @@ public class CustomerDashboard extends JFrame implements ActionListener {
 
         add(contentPanel, BorderLayout.CENTER);
 
-        // Search button
         searchButton.addActionListener(e -> triggerSearch());
         categoryComboBox.addActionListener(e -> {
             String selectedCategory = (String) categoryComboBox.getSelectedItem();
@@ -148,7 +143,6 @@ public class CustomerDashboard extends JFrame implements ActionListener {
         setVisible(true);
     }
 
-    // ===== PANELS =====
     private JPanel CreateHomePanel() {
         JPanel p = new backgroundwork("/com/image/MINE2.jpg");
         JLabel lbl = new JLabel("Welcome to GET-ONE Platform!", SwingConstants.CENTER);
@@ -171,26 +165,21 @@ public class CustomerDashboard extends JFrame implements ActionListener {
         panel.add(title);
         panel.add(Box.createVerticalStrut(20));
 
-        // Full Name
         JLabel nameLabel = new JLabel("Full Name:");
         JTextField nameField = new JTextField();
         nameField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
 
-        // Email
         JLabel emailLabel = new JLabel("Email Address:");
         JTextField emailField = new JTextField();
         emailField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
 
-        // Phone
         JLabel phoneLabel = new JLabel("Telephone Number:");
         JTextField phoneField = new JTextField();
         phoneField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
 
-        // Save button
         JButton saveButton = new JButton("Save Profile");
         saveButton.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // Add components
         panel.add(nameLabel);
         panel.add(nameField);
         panel.add(Box.createVerticalStrut(10));
@@ -205,7 +194,6 @@ public class CustomerDashboard extends JFrame implements ActionListener {
 
         panel.add(saveButton);
 
-        // Button action (temporary – no DB yet)
         saveButton.addActionListener(e -> {
             String fullName = nameField.getText().trim();
             String email = emailField.getText().trim();
@@ -255,7 +243,6 @@ public class CustomerDashboard extends JFrame implements ActionListener {
         orderTable.getTableHeader().setBackground(new Color(25, 96, 225));
         orderTable.getTableHeader().setForeground(Color.WHITE);
 
-        // Load customer orders
         try (Connection conn = DatabaseConnection.getConnection()) {
 
             String sql =
@@ -265,7 +252,7 @@ public class CustomerDashboard extends JFrame implements ActionListener {
                             "ORDER BY date DESC";
 
             PreparedStatement ps = conn.prepareStatement(sql);
-            ps.setInt(1, userId); // logged-in customer
+            ps.setInt(1, userId);
             ResultSet rs = ps.executeQuery();
 
             while (rs.next()) {
@@ -294,7 +281,6 @@ public class CustomerDashboard extends JFrame implements ActionListener {
 
         return panel;
     }
-
 
     private JPanel CreateProductsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
@@ -474,74 +460,78 @@ public class CustomerDashboard extends JFrame implements ActionListener {
                 JOptionPane.showMessageDialog(this, "Invalid user session. Please log in again.");
                 return;
             }
-
             conn.setAutoCommit(false);
 
+            PreparedStatement cartPs = conn.prepareStatement(
+                    "SELECT c.product_id, c.quantity, p.price " +
+                            "FROM cart_items c JOIN products p ON c.product_id = p.product_id " +
+                            "WHERE c.user_id = ?");
+            cartPs.setInt(1, userId);
+            ResultSet cartRs = cartPs.executeQuery();
 
-            PreparedStatement totalPs = conn.prepareStatement(
-                    "SELECT SUM(p.price * c.quantity) AS total " +
-                            "FROM cart_items c " +
-                            "JOIN products p ON c.product_id = p.product_id " +
-                            "WHERE c.user_id = ?"
-            );
-            totalPs.setInt(1, userId);
-            ResultSet rs = totalPs.executeQuery();
-
-            if (!rs.next() || rs.getDouble("total") <= 0) {
+            if (!cartRs.isBeforeFirst()) {
                 JOptionPane.showMessageDialog(this, "Your cart is empty.");
                 return;
             }
 
-            double totalAmount = rs.getDouble("total");
-
-            // SELECT PAYMENT METHOD
             String[] methods = {"Cash on Delivery", "Credit Card", "Mobile Money"};
             String paymentMethod = (String) JOptionPane.showInputDialog(
                     this, "Select Payment Method:", "Checkout",
-                    JOptionPane.PLAIN_MESSAGE, null, methods, methods[0]
-            );
+                    JOptionPane.PLAIN_MESSAGE, null, methods, methods[0]);
 
             if (paymentMethod == null) return;
 
-            // INSERT ORDER
-            PreparedStatement orderPs = conn.prepareStatement(
-                    "INSERT INTO orders (user_id, total_amount, payment_method, date, status) " +
-                            "VALUES (?, ?, ?, NOW(), 'pending')",
-                    Statement.RETURN_GENERATED_KEYS
-            );
-            orderPs.setInt(1, userId);
-            orderPs.setDouble(2, totalAmount);
-            orderPs.setString(3, paymentMethod);
-            orderPs.executeUpdate();
+            java.util.Map<Integer, Double> sellerTotals = new java.util.HashMap<>();
 
-            rs = orderPs.getGeneratedKeys();
-            rs.next();
-            int orderId = rs.getInt(1);
+            while (cartRs.next()) {
+                int productId = cartRs.getInt("product_id");
+                int qty = cartRs.getInt("quantity");
+                double price = cartRs.getDouble("price");
 
-            // INSERT ORDER ITEMS
-            PreparedStatement movePs = conn.prepareStatement(
-                    "INSERT INTO order_items (order_id, product_id, quantity, price) " +
-                            "SELECT ?, c.product_id, c.quantity, p.price " +
-                            "FROM cart_items c " +
-                            "JOIN products p ON c.product_id = p.product_id " +
-                            "WHERE c.user_id = ?"
-            );
-            movePs.setInt(1, orderId);
-            movePs.setInt(2, userId);
-            movePs.executeUpdate();
+                int sellerId = getSellerIdByProduct(productId);
+                sellerTotals.put(
+                        sellerId,
+                        sellerTotals.getOrDefault(sellerId, 0.0) + (price * qty)
+                );
+            }
 
-            // UPDATE STOCK
+            for (int sellerId : sellerTotals.keySet()) {
+
+                PreparedStatement orderPs = conn.prepareStatement(
+                        "INSERT INTO orders (user_id, total_amount, payment_method, date, status) " +
+                                "VALUES (?, ?, ?, NOW(), 'pending')",
+                        Statement.RETURN_GENERATED_KEYS);
+
+                orderPs.setInt(1, userId);
+                orderPs.setDouble(2, sellerTotals.get(sellerId));
+                orderPs.setString(3, paymentMethod);
+                orderPs.executeUpdate();
+
+                ResultSet keys = orderPs.getGeneratedKeys();
+                keys.next();
+                int orderId = keys.getInt(1);
+
+                PreparedStatement movePs = conn.prepareStatement(
+                        "INSERT INTO order_items (order_id, product_id, user_id, quantity, price) " +
+                                "SELECT ?, c.product_id, p.user_id, c.quantity, p.price " +
+                                "FROM cart_items c " +
+                                "JOIN products p ON c.product_id = p.product_id " +
+                                "WHERE c.user_id = ?"
+                );
+
+                movePs.setInt(1, orderId);
+                movePs.setInt(2, userId);
+                movePs.executeUpdate();
+            }
+
             PreparedStatement stockPs = conn.prepareStatement(
-                    "UPDATE products p " +
-                            "JOIN cart_items c ON p.product_id = c.product_id " +
-                            "SET p.stock = p.stock - c.quantity " +
-                            "WHERE c.user_id = ?"
-            );
+                    "UPDATE products p JOIN cart_items c ON p.product_id=c.product_id " +
+                            "SET p.stock=p.stock - c.quantity WHERE c.user_id=?");
             stockPs.setInt(1, userId);
             stockPs.executeUpdate();
 
-            // CLEAR CART
-            PreparedStatement clearPs = conn.prepareStatement("DELETE FROM cart_items WHERE user_id = ?");
+            PreparedStatement clearPs =
+                    conn.prepareStatement("DELETE FROM cart_items WHERE user_id=?");
             clearPs.setInt(1, userId);
             clearPs.executeUpdate();
 
@@ -554,10 +544,14 @@ public class CustomerDashboard extends JFrame implements ActionListener {
 
         } catch (Exception e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error placing order: " + e.getMessage());
+            JOptionPane.showMessageDialog(this,
+                    "Error placing order: " + e.getMessage());
         }
     }
 
+    private int getSellerIdByProduct(int userId) {
+        return userId;
+    }
 
     private void triggerSearch() {
         String cat = (String) categoryComboBox.getSelectedItem();
