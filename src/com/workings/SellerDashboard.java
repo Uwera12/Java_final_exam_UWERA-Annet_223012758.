@@ -6,8 +6,8 @@ import com.test.DatabaseConnection;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.*;
 import java.math.BigDecimal;
+import java.awt.event.*;
 import java.sql.*;
 
 public class SellerDashboard extends JFrame implements ActionListener {
@@ -21,12 +21,16 @@ public class SellerDashboard extends JFrame implements ActionListener {
     private JPanel shipmentPanel = new JPanel();
     private JPanel categoryPanel = new JPanel();
     private JPanel paymentPanel = new JPanel();
+    private JPanel orderItemPanel= new JPanel();
+    private JPanel orderPaymentPanel = new JPanel();
 
     private JTable productTable = new JTable();
     private JTable orderTable = new JTable();
     private JTable shipmentTable = new JTable();
     private JTable categoryTable = new JTable();
     private JTable paymentTable = new JTable();
+    private JTable orderItemTable = new JTable();
+    private JTable orderPaymentTable = new JTable();
 
     private JButton logoutButton = new JButton("Logout");
 
@@ -81,12 +85,16 @@ public class SellerDashboard extends JFrame implements ActionListener {
         setupShipmentPanel();
         setupCategoryPanel();
         setupPaymentPanel();
+        setupOrderItemPanel();
+        setupOrderPaymentPanel();
 
         tabbedPane.addTab("Products", productPanel);
         tabbedPane.addTab("Orders", orderPanel);
         tabbedPane.addTab("Shipments", shipmentPanel);
         tabbedPane.addTab("Categories", categoryPanel);
         tabbedPane.addTab("Payments", paymentPanel);
+        tabbedPane.addTab("Order Items", orderItemPanel);
+        tabbedPane.addTab("Order Payments", orderPaymentPanel);
         tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 16));
 
         add(tabbedPane, BorderLayout.CENTER);
@@ -118,11 +126,11 @@ public class SellerDashboard extends JFrame implements ActionListener {
         loadShipments();
         loadCategories();
         loadPayments();
+        loadOrderItems();
+        loadOrderPayments();
 
         setVisible(true);
     }
-
-
 
     private void setupProductPanel() {
         productPanel.setLayout(new BorderLayout());
@@ -176,32 +184,37 @@ public class SellerDashboard extends JFrame implements ActionListener {
 
         orderPanel.add(btn, BorderLayout.SOUTH);
     }
-
     private void loadOrders() {
         DefaultTableModel m = new DefaultTableModel();
         m.setColumnIdentifiers(new Object[]{
-                "Order ID","User ID","Order Number","Date","Status","Total Amount","Payment Method"
+                "Order ID","Customer ID","Order Number","Date","Status","Total Amount","Payment Method"
         });
         orderTable.setModel(m);
 
         String sql = """
-                SELECT DISTINCT o.*
-                FROM orders o
-                JOIN order_items oi ON o.order_id = oi.order_id
-                JOIN products p ON oi.product_id = p.product_id
-                WHERE p.user_id = ?
-                """;
+            SELECT DISTINCT o.order_id AS order_id,
+                   o.user_id AS customer_id,
+                   o.order_number,
+                   o.date,
+                   o.status,
+                   o.total_amount,
+                   o.payment_method
+            FROM orders o
+            JOIN order_items oi ON o.order_id = oi.order_id
+            JOIN products p ON oi.product_id = p.product_id
+            WHERE p.user_id = ?
+        """;
 
         try (Connection c = DatabaseConnection.getConnection();
-             PreparedStatement p = c.prepareStatement(sql)) {
+             PreparedStatement ps = c.prepareStatement(sql)) {
 
-            p.setInt(1, userId);
-            ResultSet r = p.executeQuery();
+            ps.setInt(1, userId);
+            ResultSet r = ps.executeQuery();
 
             while (r.next()) {
                 m.addRow(new Object[]{
                         r.getInt("order_id"),
-                        r.getInt("user_id"),
+                        r.getInt("customer_id"),
                         r.getString("order_number"),
                         r.getTimestamp("date"),
                         r.getString("status"),
@@ -209,6 +222,7 @@ public class SellerDashboard extends JFrame implements ActionListener {
                         r.getString("payment_method")
                 });
             }
+
         } catch (Exception e) {
             showError(e);
         }
@@ -228,24 +242,24 @@ public class SellerDashboard extends JFrame implements ActionListener {
     private void loadShipments() {
         DefaultTableModel m = new DefaultTableModel();
         m.setColumnIdentifiers(new Object[]{
-                "Shipment ID","Order ID","Tracking Number","Status","Created"
+                "Shipment ID","Order ID","Tracking Number","Status","Created At"
         });
         shipmentTable.setModel(m);
 
         String sql = """
-                SELECT DISTINCT s.*
-                FROM shipments s
-                JOIN orders o ON s.order_id = o.order_id
-                JOIN order_items oi ON o.order_id = oi.order_id
-                JOIN products p ON oi.product_id = p.product_id
-                WHERE p.user_id = ?
-                """;
+        SELECT DISTINCT s.shipment_id, s.order_id, s.tracking_number, s.status, s.created_at
+        FROM shipments s
+        JOIN orders o ON s.order_id = o.order_id
+        JOIN order_items oi ON o.order_id = oi.order_id
+        JOIN products p ON oi.product_id = p.product_id
+        WHERE p.user_id = ?
+    """;
 
         try (Connection c = DatabaseConnection.getConnection();
-             PreparedStatement p = c.prepareStatement(sql)) {
+             PreparedStatement ps = c.prepareStatement(sql)) {
 
-            p.setInt(1, userId);
-            ResultSet r = p.executeQuery();
+            ps.setInt(1, userId);
+            ResultSet r = ps.executeQuery();
 
             while (r.next()) {
                 m.addRow(new Object[]{
@@ -256,6 +270,7 @@ public class SellerDashboard extends JFrame implements ActionListener {
                         r.getTimestamp("created_at")
                 });
             }
+
         } catch (Exception e) {
             showError(e);
         }
@@ -308,34 +323,115 @@ public class SellerDashboard extends JFrame implements ActionListener {
 
         paymentPanel.add(btn, BorderLayout.SOUTH);
     }
-
     private void loadPayments() {
-        DefaultTableModel m = new DefaultTableModel();
-        m.setColumnIdentifiers(new Object[]{
-                "ID","Amount","Type","Reference","Status","Date"
-        });
+        DefaultTableModel m = new DefaultTableModel(
+                new String[]{"Payment ID","Order ID","Customer","Amount","Payment Method","Status","Date"},0);
         paymentTable.setModel(m);
 
-        try (Connection c = DatabaseConnection.getConnection();
-             PreparedStatement p = c.prepareStatement(
-                     "SELECT * FROM payments WHERE user_id=?")) {
+        String sql = """
+            SELECT
+                pay.payment_id AS pid,
+                op.order_id AS oid,
+                o.user_id AS customer,
+                pay.amount,
+                pay.type AS method,
+                pay.status,
+                pay.date
+            FROM payments pay
+            JOIN order_payments op ON pay.payment_id=op.payment_id
+            JOIN orders o ON op.order_id=o.order_id
+            JOIN order_items oi ON o.order_id=oi.order_id
+            WHERE oi.user_id=?
+        """;
 
-            p.setInt(1, userId);
-            ResultSet r = p.executeQuery();
+        try (Connection c = DatabaseConnection.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setInt(1, userId);
+            ResultSet r = ps.executeQuery();
+            while (r.next()) {
+                m.addRow(new Object[]{
+                        r.getInt("pid"),
+                        r.getInt("oid"),
+                        r.getInt("customer"),
+                        r.getBigDecimal("amount"),
+                        r.getString("method"),
+                        r.getString("status"),
+                        r.getTimestamp("date")
+                });
+            }
+        } catch (Exception e) { showError(e); }
+    }
+
+    private void setupOrderItemPanel(){
+        orderItemPanel.setLayout(new BorderLayout());
+        orderItemPanel.add(new JScrollPane(orderItemTable));
+    }
+    private void loadOrderItems() {
+        DefaultTableModel m = new DefaultTableModel();
+        m.setColumnIdentifiers(new Object[]{
+                "Order Item ID", "Order ID", "Product ID",
+                "Quantity", "Price", "Seller ID"
+        });
+        orderItemTable.setModel(m);
+
+        String sql = """
+        SELECT oi.*
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.product_id
+        WHERE p.user_id = ?
+        """;
+
+        try (Connection c = DatabaseConnection.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setInt(1, userId);
+            ResultSet r = ps.executeQuery();
 
             while (r.next()) {
                 m.addRow(new Object[]{
-                        r.getInt("payment_id"),
-                        r.getBigDecimal("amount"),
-                        r.getString("type"),
-                        r.getString("reference"),
-                        r.getString("status"),
-                        r.getTimestamp("date")
+                        r.getInt("order_item_id"),
+                        r.getInt("order_id"),
+                        r.getInt("product_id"),
+                        r.getInt("quantity"),
+                        r.getBigDecimal("price"),
+                        r.getInt("user_id")
                 });
             }
         } catch (Exception e) {
             showError(e);
         }
+    }
+
+    private void setupOrderPaymentPanel(){
+        orderPaymentPanel.setLayout(new BorderLayout());
+        orderPaymentPanel.add(new JScrollPane(orderPaymentTable));
+    }
+    private void loadOrderPayments() {
+        DefaultTableModel m = new DefaultTableModel(
+                new String[]{"ID","Order ID","Payment ID"},0);
+        orderPaymentTable.setModel(m);
+
+        String sql = """
+            SELECT op.id,op.order_id,op.payment_id
+            FROM order_payments op
+            JOIN order_items oi ON op.order_id=oi.order_id
+            WHERE oi.user_id=?
+        """;
+
+        try (Connection c = DatabaseConnection.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setInt(1, userId);
+            ResultSet r = ps.executeQuery();
+            while (r.next()) {
+                m.addRow(new Object[]{
+                        r.getInt("id"),
+                        r.getInt("order_id"),
+                        r.getInt("payment_id")
+                });
+            }
+        } catch (Exception e) { showError(e); }
     }
 
     public void actionPerformed(ActionEvent e) {
@@ -503,49 +599,68 @@ public class SellerDashboard extends JFrame implements ActionListener {
         }
     }
     private void approveOrder() {
+        int row = orderTable.getSelectedRow();
+        if (row == -1) return;
 
-        JTextField customerId = new JTextField();
-        JTextField orderNumber = new JTextField();
-        JTextField total = new JTextField();
+        int orderId = (int) orderTable.getValueAt(row, 0);
+        int customerId = (int) orderTable.getValueAt(row, 1);
+        BigDecimal total = (BigDecimal) orderTable.getValueAt(row, 5);
+        String method = orderTable.getValueAt(row, 6).toString();
 
-        JComboBox<String> payment = new JComboBox<>(
-                new String[]{"Cash", "Mobile Money", "Card"}
-        );
+        try (Connection c = DatabaseConnection.getConnection()) {
+            c.setAutoCommit(false);
+            PreparedStatement checkOrder =
+                    c.prepareStatement("SELECT order_number FROM orders WHERE order_id=?");
+            checkOrder.setInt(1, orderId);
+            ResultSet rsOrder = checkOrder.executeQuery();
 
-        Object[] fields = {
-                "Customer ID:", customerId,
-                "Order Number:", orderNumber,
-                "Total Amount:", total,
-                "Payment Method:", payment
-        };
-
-        int choice = JOptionPane.showConfirmDialog(
-                this, fields, "Add Order",
-                JOptionPane.OK_CANCEL_OPTION);
-
-        if (choice == JOptionPane.OK_OPTION) {
-
-            try (Connection conn = DatabaseConnection.getConnection()) {
-
-                String sql =
-                        "INSERT INTO orders(user_id, order_number, status, total_amount, payment_method) " +
-                                "VALUES (?, ?, 'pending', ?, ?)";
-
-                PreparedStatement ps = conn.prepareStatement(sql);
-                ps.setInt(1, Integer.parseInt(customerId.getText()));
-                ps.setString(2, orderNumber.getText());
-                ps.setDouble(3, Double.parseDouble(total.getText()));
-                ps.setString(4, payment.getSelectedItem().toString());
-
-                ps.executeUpdate();
-
-                JOptionPane.showMessageDialog(this, "Order created successfully");
-                loadOrders();
-
-            } catch (SQLException e) {
-                JOptionPane.showMessageDialog(this, e.getMessage());
+            String orderNumber = null;
+            if (rsOrder.next()) {
+                orderNumber = rsOrder.getString("order_number");
             }
-        }
+            if (orderNumber == null || orderNumber.trim().isEmpty()) {
+
+                orderNumber = "ORD-" + System.currentTimeMillis();
+
+                PreparedStatement updateOrderNo =
+                        c.prepareStatement(
+                                "UPDATE orders SET order_number=? WHERE order_id=?"
+                        );
+                updateOrderNo.setString(1, orderNumber);
+                updateOrderNo.setInt(2, orderId);
+                updateOrderNo.executeUpdate();
+            }
+
+            c.prepareStatement(
+                    "UPDATE orders SET status='paid' WHERE order_id="+orderId).executeUpdate();
+
+            PreparedStatement ps = c.prepareStatement(
+                    "INSERT INTO payments(amount,type,status,user_id,date) VALUES (?,?, 'completed', ?, NOW())",
+                    Statement.RETURN_GENERATED_KEYS);
+            ps.setBigDecimal(1, total);
+            ps.setString(2, method);
+            ps.setInt(3, customerId);
+            ps.executeUpdate();
+
+            ResultSet rs = ps.getGeneratedKeys();
+            rs.next();
+            int paymentId = rs.getInt(1);
+
+            c.prepareStatement(
+                            "INSERT INTO order_payments(order_id,payment_id) VALUES ("+orderId+","+paymentId+")")
+                    .executeUpdate();
+
+            c.prepareStatement(
+                    "INSERT INTO shipments(order_id,tracking_number,status,created_at) VALUES ("+
+                            orderId+",'', 'processing', NOW())");
+                    ps.setInt(1, orderId);
+                    ps.setString(2, "PENDING");
+                    ps.executeUpdate();
+
+            c.commit();
+            loadOrders(); loadPayments(); loadOrderPayments(); loadShipments();
+
+        } catch (Exception e) { showError(e); }
     }
 
     private void deleteOrder() {
@@ -906,7 +1021,12 @@ public class SellerDashboard extends JFrame implements ActionListener {
                 }
 
                 String sql =
-                        "INSERT INTO shipments(order_id, tracking_number, status) VALUES (?, ?, ?)";
+                        "INSERT INTO shipments(order_id, tracking_number, status) " +
+                                "VALUES (?, ?, ?) " +
+                                "ON DUPLICATE KEY UPDATE " +
+                                "tracking_number = VALUES(tracking_number), " +
+                                "status = VALUES(status)";
+
                 PreparedStatement ps = conn.prepareStatement(sql);
 
                 ps.setInt(1, Integer.parseInt(orderId.getText()));
