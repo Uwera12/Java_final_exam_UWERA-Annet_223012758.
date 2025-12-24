@@ -14,23 +14,23 @@ public class AdminDashboard extends JFrame implements ActionListener {
 
     private JLabel welcomeLabel;
     private JTabbedPane tabbedPane;
+    private JTextField searchUserField;
+
 
     private JPanel usersPanel, sellersPanel, productsPanel, ordersPanel, paymentsPanel, shipmentsPanel, reportsPanel, settingsPanel;
     private JTable usersTable, sellersTable, productsTable, ordersTable, paymentsTable, shipmentsTable;
 
-    private JButton logoutButton, addProductButton, deleteProductButton;
+    private JButton logoutButton, searchUserButton, addUserBtn,updateUserBtn,deleteUserBtn,refreshUserBtn, addProductButton, deleteProductButton;
 
-    // In-memory storage for seller statuses
     private HashMap<Integer, String> sellerStatusMap = new HashMap<>();
 
     public AdminDashboard(String fullname) {
         setTitle("ECOMMERCE PLATFORM SYSTEM | Admin Dashboard");
-        setSize(1300, 750);
+        setSize(1300, 700);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
         setVisible(true);
 
-        // Header
         JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 10));
         header.setBackground(new Color(245, 245, 245));
 
@@ -53,11 +53,9 @@ public class AdminDashboard extends JFrame implements ActionListener {
         header.add(logoutButton);
         add(header, BorderLayout.NORTH);
 
-        // Tabbed Pane
         tabbedPane = new JTabbedPane();
         tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 18));
 
-        // Initialize Panels
         initUsersPanel();
         initSellersPanel();
         initProductsPanel();
@@ -67,7 +65,6 @@ public class AdminDashboard extends JFrame implements ActionListener {
         initReportsPanel();
         initSettingsPanel();
 
-        // Add Tabs
         tabbedPane.addTab("Users", usersPanel);
         tabbedPane.addTab("Sellers", sellersPanel);
         tabbedPane.addTab("Products", productsPanel);
@@ -79,20 +76,46 @@ public class AdminDashboard extends JFrame implements ActionListener {
 
         add(tabbedPane, BorderLayout.CENTER);
 
-        // Load Data
         loadUsersTable();
         loadSellersTable();
         loadProductsTable();
         loadOrdersTable();
         loadPaymentsTable();
         loadShipmentsTable();
-    }
 
-    // -------------------- Users Panel --------------------
+    }
     private void initUsersPanel() {
         usersPanel = new JPanel(new BorderLayout(10, 10));
+
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchUserField = new JTextField(20);
+        searchUserButton = new JButton("Search");
+        searchUserButton.addActionListener(this); 
+        searchPanel.add(new JLabel("Search User: "));
+        searchPanel.add(searchUserField);
+        searchPanel.add(searchUserButton);
+
         usersTable = new JTable();
+        usersPanel.add(searchPanel, BorderLayout.NORTH);
         usersPanel.add(new JScrollPane(usersTable), BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel();
+        addUserBtn = new JButton("Add User");
+        updateUserBtn = new JButton("Update User");
+        deleteUserBtn = new JButton("Delete User");
+        refreshUserBtn = new JButton("Refresh");
+
+        addUserBtn.addActionListener(this);
+        updateUserBtn.addActionListener(this);
+        deleteUserBtn.addActionListener(this);
+        refreshUserBtn.addActionListener(this);
+
+        btnPanel.add(addUserBtn);
+        btnPanel.add(updateUserBtn);
+        btnPanel.add(deleteUserBtn);
+        btnPanel.add(refreshUserBtn);
+
+        usersPanel.add(btnPanel, BorderLayout.SOUTH);
     }
 
     private void loadUsersTable() {
@@ -119,23 +142,137 @@ public class AdminDashboard extends JFrame implements ActionListener {
             JOptionPane.showMessageDialog(this, "Failed to load Users: " + e.getMessage());
         }
     }
+    private void addUser() {
+        JTextField username = new JTextField();
+        JTextField email = new JTextField();
+        JTextField fullname = new JTextField();
+        JComboBox<String> role = new JComboBox<>(new String[]{"admin", "seller", "customer"});
+        JPasswordField password = new JPasswordField();
 
-    // -------------------- Sellers Panel --------------------
+        Object[] fields = {
+                "Username:", username,
+                "Email:", email,
+                "Full Name:", fullname,
+                "Role:", role,
+                "Password:", password
+        };
+
+        if (JOptionPane.showConfirmDialog(this, fields, "Add User", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
+            try (Connection conn = DatabaseConnection.getConnection()) {
+                PreparedStatement pst = conn.prepareStatement(
+                        "INSERT INTO users (username,email,full_name,role,password_hash) VALUES (?,?,?,?,SHA2(?,256))"
+                );
+                pst.setString(1, username.getText());
+                pst.setString(2, email.getText());
+                pst.setString(3, fullname.getText());
+                pst.setString(4, role.getSelectedItem().toString());
+                pst.setString(5, new String(password.getPassword()));
+                pst.executeUpdate();
+                loadUsersTable();
+            } catch (SQLException e) {
+                JOptionPane.showMessageDialog(this, e.getMessage());
+            }
+        }
+    }
+
+    private void updateUser() {
+        int row = usersTable.getSelectedRow();
+        if (row == -1) return;
+
+        int userId = (int) usersTable.getValueAt(row, 0);
+        JTextField email = new JTextField(usersTable.getValueAt(row, 2).toString());
+        JTextField fullname = new JTextField(usersTable.getValueAt(row, 3).toString());
+        JComboBox<String> role = new JComboBox<>(new String[]{"admin", "seller", "customer"});
+        role.setSelectedItem(usersTable.getValueAt(row, 4).toString());
+
+        Object[] fields = {"Email:", email, "Full Name:", fullname, "Role:", role};
+
+        if (JOptionPane.showConfirmDialog(this, fields, "Update User", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
+            try (Connection conn = DatabaseConnection.getConnection()) {
+                PreparedStatement pst = conn.prepareStatement(
+                        "UPDATE users SET email=?, full_name=?, role=? WHERE user_id=?"
+                );
+                pst.setString(1, email.getText());
+                pst.setString(2, fullname.getText());
+                pst.setString(3, role.getSelectedItem().toString());
+                pst.setInt(4, userId);
+                pst.executeUpdate();
+                loadUsersTable();
+            } catch (SQLException e) {
+                JOptionPane.showMessageDialog(this, e.getMessage());
+            }
+        }
+    }
+
+    private void deleteUser() {
+        int row = usersTable.getSelectedRow();
+        if (row == -1) return;
+
+        int userId = (int) usersTable.getValueAt(row, 0);
+        if (JOptionPane.showConfirmDialog(this, "Delete this user?") == JOptionPane.YES_OPTION) {
+            try (Connection conn = DatabaseConnection.getConnection()) {
+                PreparedStatement pst = conn.prepareStatement("DELETE FROM users WHERE user_id=?");
+                pst.setInt(1, userId);
+                pst.executeUpdate();
+                loadUsersTable();
+            } catch (SQLException e) {
+                JOptionPane.showMessageDialog(this, e.getMessage());
+            }
+        }
+    }
+    private void searchUsers(String keyword) {
+        DefaultTableModel model = new DefaultTableModel();
+        model.setColumnIdentifiers(new Object[]{"User ID", "Username", "Email", "Full Name", "Role", "Created At", "Last Login"});
+        usersTable.setModel(model);
+
+        if (keyword.isEmpty()) {
+            loadUsersTable();
+            return;
+        }
+
+        String sql = "SELECT user_id, username, email, full_name, role, created_at, last_login " +
+                "FROM users " +
+                "WHERE username LIKE ? OR full_name LIKE ? OR email LIKE ? " +
+                "ORDER BY user_id ASC";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            String searchPattern = "%" + keyword + "%";
+            ps.setString(1, searchPattern);
+            ps.setString(2, searchPattern);
+            ps.setString(3, searchPattern);
+
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                model.addRow(new Object[]{
+                        rs.getInt("user_id"),
+                        rs.getString("username"),
+                        rs.getString("email"),
+                        rs.getString("full_name"),
+                        rs.getString("role"),
+                        rs.getTimestamp("created_at"),
+                        rs.getTimestamp("last_login")
+                });
+            }
+
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Failed to search users: " + e.getMessage());
+        }
+    }
+
     private void initSellersPanel() {
         sellersPanel = new JPanel(new BorderLayout(10, 10));
         sellersTable = new JTable();
         sellersPanel.add(new JScrollPane(sellersTable), BorderLayout.CENTER);
 
-        // Table model
         DefaultTableModel model = new DefaultTableModel(new Object[]{"User ID", "Full Name", "Email", "Status", "Created At", "Last Login"}, 0) {
-            @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 3; // Only Status editable
+                return column == 3;
             }
         };
         sellersTable.setModel(model);
 
-        // Save Statuses Button
         JButton saveStatusesButton = new JButton("Save Statuses");
         saveStatusesButton.addActionListener(e -> saveSellerStatuses());
 
@@ -146,7 +283,7 @@ public class AdminDashboard extends JFrame implements ActionListener {
 
     private void loadSellersTable() {
         DefaultTableModel model = (DefaultTableModel) sellersTable.getModel();
-        model.setRowCount(0); // Clear existing data
+        model.setRowCount(0);
 
         try (Connection conn = DatabaseConnection.getConnection()) {
             String sql = "SELECT user_id, full_name, email, created_at, last_login FROM users WHERE role='seller' ORDER BY user_id ASC";
@@ -154,7 +291,7 @@ public class AdminDashboard extends JFrame implements ActionListener {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 int userId = rs.getInt("user_id");
-                String status = sellerStatusMap.getOrDefault(userId, "Pending"); // load from memory
+                String status = sellerStatusMap.getOrDefault(userId, "Pending");
                 model.addRow(new Object[]{
                         userId,
                         rs.getString("full_name"),
@@ -169,18 +306,16 @@ public class AdminDashboard extends JFrame implements ActionListener {
         }
     }
 
-    // -------------------- Save Seller Statuses --------------------
     private void saveSellerStatuses() {
         DefaultTableModel model = (DefaultTableModel) sellersTable.getModel();
         for (int i = 0; i < model.getRowCount(); i++) {
             int userId = (int) model.getValueAt(i, 0);
             String status = (String) model.getValueAt(i, 3);
-            sellerStatusMap.put(userId, status); // Save in memory
+            sellerStatusMap.put(userId, status);
         }
         JOptionPane.showMessageDialog(this, "Seller statuses saved successfully!");
     }
 
-    // -------------------- Products Panel --------------------
     private void initProductsPanel() {
         productsPanel = new JPanel(new BorderLayout(10, 10));
         productsTable = new JTable();
@@ -224,7 +359,6 @@ public class AdminDashboard extends JFrame implements ActionListener {
         }
     }
 
-    // -------------------- Orders Panel --------------------
     private void initOrdersPanel() {
         ordersPanel = new JPanel(new BorderLayout(10, 10));
         ordersTable = new JTable();
@@ -248,8 +382,6 @@ public class AdminDashboard extends JFrame implements ActionListener {
                         rs.getString("status"),
                         rs.getDouble("total_amount"),
                         rs.getString("payment_method")
-
-
                 });
             }
         } catch (SQLException e) {
@@ -257,7 +389,6 @@ public class AdminDashboard extends JFrame implements ActionListener {
         }
     }
 
-    // -------------------- Payments Panel --------------------
     private void initPaymentsPanel() {
         paymentsPanel = new JPanel(new BorderLayout(10, 10));
         paymentsTable = new JTable();
@@ -266,27 +397,57 @@ public class AdminDashboard extends JFrame implements ActionListener {
 
     private void loadPaymentsTable() {
         DefaultTableModel model = new DefaultTableModel();
-        model.setColumnIdentifiers(new Object[]{"Payment ID", "Order ID", "Amount", "Status", "Created At"});
+        model.setColumnIdentifiers(new Object[]{
+                "Payment ID",
+                "Order ID",
+                "Order Number",
+                "User ID",
+                "Amount",
+                "Payment Method",
+                "Status",
+                "Date"
+        });
         paymentsTable.setModel(model);
 
+        String sql = """
+    SELECT
+        pay.payment_id,
+        o.order_id,
+        o.order_number,
+        o.user_id,
+        pay.amount,
+        pay.type AS payment_method,
+        pay.status,
+        pay.date
+    FROM payments pay
+    JOIN order_payments op ON pay.payment_id = op.payment_id
+    JOIN orders o ON op.order_id = o.order_id
+    ORDER BY pay.payment_id DESC
+""";
+
         try (Connection conn = DatabaseConnection.getConnection();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT * FROM payments ORDER BY payment_id DESC")) {
+             PreparedStatement ps = conn.prepareStatement(sql);
+
+             ResultSet rs = ps.executeQuery()) {
+
             while (rs.next()) {
                 model.addRow(new Object[]{
                         rs.getInt("payment_id"),
                         rs.getInt("order_id"),
+                        rs.getString("order_number"),
+                        rs.getInt("user_id"),
                         rs.getDouble("amount"),
+                        rs.getString("payment_method"),
                         rs.getString("status"),
-                        rs.getTimestamp("created_at")
+                        rs.getTimestamp("date")
                 });
             }
+
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(this, "Error loading payments: " + e.getMessage());
         }
     }
 
-    // -------------------- Shipments Panel --------------------
     private void initShipmentsPanel() {
         shipmentsPanel = new JPanel(new BorderLayout(10, 10));
         shipmentsTable = new JTable();
@@ -314,20 +475,16 @@ public class AdminDashboard extends JFrame implements ActionListener {
         }
     }
 
-    // -------------------- Reports Panel --------------------
     private void initReportsPanel() {
         reportsPanel = new JPanel(new BorderLayout());
         reportsPanel.add(new JLabel("Reports & Analytics (placeholder)", JLabel.CENTER), BorderLayout.CENTER);
     }
 
-    // -------------------- Settings Panel --------------------
     private void initSettingsPanel() {
         settingsPanel = new JPanel(new BorderLayout());
         settingsPanel.add(new JLabel("Platform Settings (placeholder)", JLabel.CENTER), BorderLayout.CENTER);
     }
 
-    // -------------------- Action Handling --------------------
-    @Override
     public void actionPerformed(ActionEvent e) {
         Object src = e.getSource();
 
@@ -337,10 +494,21 @@ public class AdminDashboard extends JFrame implements ActionListener {
                 dispose();
                 new Elogin().setVisible(true);
             }
-        } else if (src == addProductButton) {
+        } else if (src == searchUserButton) {
+            searchUsers(searchUserField.getText().trim());
+        }
+        else if (src == addProductButton) {
             addProductDialog();
         } else if (src == deleteProductButton) {
             deleteProduct();
+        }else if (src == addUserBtn){
+            addUser();
+        } else if (src == updateUserBtn) {
+            updateUser();
+        } else if (src == deleteUserBtn) {
+            deleteUser();
+        }else if (src == refreshUserBtn){
+            loadUsersTable();
         }
     }
 
@@ -403,7 +571,6 @@ public class AdminDashboard extends JFrame implements ActionListener {
         }
     }
 
-    // -------------------- Main --------------------
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             String adminFullN = getFirstAdminFullName();
