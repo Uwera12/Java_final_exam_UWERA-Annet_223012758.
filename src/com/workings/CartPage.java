@@ -71,7 +71,6 @@ import java.sql.*;
                 rs.next();
                 double totalAmount = rs.getDouble("total");
 
-                // create order
                 PreparedStatement orderPs = conn.prepareStatement(
                         "INSERT INTO orders (user_id, total_amount) VALUES (?, ?)",
                         Statement.RETURN_GENERATED_KEYS
@@ -84,7 +83,6 @@ import java.sql.*;
                 rs.next();
                 int orderId = rs.getInt(1);
 
-                // insert order items
                 PreparedStatement movePs = conn.prepareStatement("""
                 INSERT INTO order_items (order_id, product_id, quantity, price)
                 SELECT ?, c.product_id, c.quantity, p.price
@@ -95,7 +93,6 @@ import java.sql.*;
                 movePs.setInt(2, userId);
                 movePs.executeUpdate();
 
-                // reduce stock
                 PreparedStatement stockPs = conn.prepareStatement("""
                 UPDATE products p
                 JOIN cart_items c ON p.product_id=c.product_id
@@ -105,7 +102,6 @@ import java.sql.*;
                 stockPs.setInt(1, userId);
                 stockPs.executeUpdate();
 
-                // clear cart
                 PreparedStatement clearPs = conn.prepareStatement("DELETE FROM cart_items WHERE user_id=?");
                 clearPs.setInt(1, userId);
                 clearPs.executeUpdate();
@@ -124,127 +120,4 @@ import java.sql.*;
     }
 
 
-   /* private void deleteSelected(JTable table, String tableName, String idColumn) {
-        int row = table.getSelectedRow();
-        if (row == -1) {
-            JOptionPane.showMessageDialog(this, "Select a record to delete!");
-            return;
-        }
-        int id = (int) table.getValueAt(row, 0);
-        try (Connection conn = DatabaseConnection.getConnection()) {
-            PreparedStatement pst = conn.prepareStatement("DELETE FROM " + tableName + " WHERE " + idColumn + "=?");
-            pst.setInt(1, id);
-            pst.executeUpdate();
-            JOptionPane.showMessageDialog(this, "Record deleted successfully!");
-            if (table == productTable) loadProducts();
-            else if (table == orderTable) loadOrders();
-            else loadShipments();
-        } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(this, "Error deleting: " + ex.getMessage());
-        }
-    }
-
-    private void exportData() {
-        JTable selectedTable = switch (tabbedPane.getSelectedIndex()) {
-            case 0 -> productTable;
-            case 1 -> orderTable;
-            case 2 -> shipmentTable;
-            default -> null;
-        };
-        if (selectedTable == null) return;
-
-        JFileChooser chooser = new JFileChooser();
-        chooser.setSelectedFile(new java.io.File("export.xls"));
-        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
-
-        try (java.io.PrintWriter out = new java.io.PrintWriter(chooser.getSelectedFile())) {
-            DefaultTableModel model = (DefaultTableModel) selectedTable.getModel();
-            for (int i = 0; i < model.getColumnCount(); i++) {
-                out.print(model.getColumnName(i) + "\t");
-            }
-            out.println();
-            for (int r = 0; r < model.getRowCount(); r++) {
-                for (int c = 0; c < model.getColumnCount(); c++) {
-                    out.print(model.getValueAt(r, c) + "\t");
-                }
-                out.println();
-            }
-            JOptionPane.showMessageDialog(this, "Data exported successfully!");
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Export failed: " + e.getMessage());
-        }
-    }
-
-    public void actionPerformed(ActionEvent e) {
-        Object src = e.getSource();
-
-        if (src == logoutButton) {
-            dispose();
-            JOptionPane.showMessageDialog(this, "Logged out successfully!");
-            new Elogin().setVisible(true);
-        }
-        else if (src == exportButton) {
-            exportData();
-        }
-        else if (src == addProductButton) {
-            addProduct();
-
-        } else if (src == deleteProductButton) {
-            deleteSelected(productTable, "products", "product_id");
-        }
-        else if (src == approveOrderButton) {
-            approveOrder();
-        }
-        else if (src == deleteOrderButton) {
-            deleteSelected(orderTable, "orders", "order_id");
-
-        } else if (src == rejectOrdersButton) {
-            int row = orderTable.getSelectedRow();
-            if (row == -1) {
-                JOptionPane.showMessageDialog(this, "Select an order first to reject!");
-            } else {
-                Object idObj = orderTable.getValueAt(row, 0);
-                int orderId;
-                try {
-                    orderId = parseId(idObj);
-                } catch (NumberFormatException ex) {
-                    JOptionPane.showMessageDialog(this, "Cannot determine Order ID from selected row.");
-                    return;
-                }
-
-                int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to reject order " + orderId + "?", "Confirm Reject", JOptionPane.YES_NO_OPTION);
-                if (confirm == JOptionPane.YES_OPTION) {
-                    rejectOrder(orderId);
-                }
-            }
-
-        } else if (src == addShipmentButton) {
-            addShipment();
-        }
-        else if (src == deleteShipmentButton) {
-            deleteSelected(shipmentTable, "shipments", "shipment_id");
-        }
-    }
-
-    private int parseId(Object idObj) throws NumberFormatException {
-        if (idObj == null) throw new NumberFormatException("ID is null");
-        if (idObj instanceof Integer) {
-            return (Integer) idObj;
-        } else if (idObj instanceof Long) {
-            return ((Long) idObj).intValue();
-        } else if (idObj instanceof Number) { // covers BigDecimal, Double, etc.
-            return ((Number) idObj).intValue();
-        } else {
-
-            String s = idObj.toString().trim();
-            return Integer.parseInt(s);
-        }
-    }
-
-
-    public static void main(String[] args) {
-        new SellerDashboard("Seller");
-    }
-}*/
-
-
+   
